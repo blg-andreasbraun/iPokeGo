@@ -7,6 +7,9 @@
 //
 
 #import "MapViewController.h"
+#import "TimeLabel.h"
+#import "TimerLabel.h"
+#import "DistanceLabel.h"
 
 @interface MapViewController ()
 
@@ -39,28 +42,18 @@
     [self loadLocalization];
     [self checkGPS];
     [self loadSoundFiles];
-    self.requestStr = [self buildRequest];
+    self.requestStr             = [self buildRequest];
     
     if(self.requestStr != nil)
     {
-        self.timerData = [NSTimer scheduledTimerWithTimeInterval:5.0
-                                                          target:self
-                                                        selector:@selector(loadData)
-                                                        userInfo:nil
-                                                         repeats:YES];
-        
-        self.timerDataCleaner = [NSTimer scheduledTimerWithTimeInterval:1.0
-                                                                 target:self
-                                                               selector:@selector(mapCleaner)
-                                                               userInfo:nil
-                                                                repeats:YES];
+        [self launchTimers];
         
     }
     else
     {
         UIAlertController *alert = [UIAlertController
-                                    alertControllerWithTitle:@"Error"
-                                    message:@"Impossible to make the request"
+                                    alertControllerWithTitle:@"Server not set"
+                                    message:@"Please go in settings to enter server address"
                                     preferredStyle:UIAlertControllerStyleAlert];
         
         UIAlertAction *ok = [UIAlertAction
@@ -73,12 +66,34 @@
         [self presentViewController:alert animated:YES completion:nil];
     }
     
-    
 }
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
+}
+
+-(void)launchTimers
+{
+    if(![self.timerData isValid])
+    {
+        NSLog(@"[+] Starting data timer...");
+        self.timerData = [NSTimer scheduledTimerWithTimeInterval:5
+                                                          target:self
+                                                        selector:@selector(loadData)
+                                                        userInfo:nil
+                                                         repeats:YES];
+    }
+    
+    if(![self.timerDataCleaner isValid])
+    {
+        NSLog(@"[+] Starting clear timer...");
+        self.timerDataCleaner = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                                 target:self
+                                                               selector:@selector(mapCleaner)
+                                                               userInfo:nil
+                                                                repeats:YES];
+    }
 }
 
 -(void)initObserver
@@ -94,6 +109,95 @@
                                     selector:@selector(loadSavedData)
                                     name:@"LoadSaveData"
                                     object:nil];
+    
+    [[NSNotificationCenter defaultCenter]
+                                    addObserver:self
+                                    selector:@selector(launchTimers)
+                                    name:@"LaunchTimers"
+                                    object:nil];
+    
+    [[NSNotificationCenter defaultCenter]
+                                    addObserver:self
+                                    selector:@selector(refreshPokemons)
+                                    name:@"RefreshPokemons"
+                                    object:nil];
+    
+    UILongPressGestureRecognizer *longPressGesture = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGesture:)];
+    [self.mapview addGestureRecognizer:longPressGesture];
+}
+
+#pragma mark Long gesture press
+
+-(void)handleLongPressGesture:(UIGestureRecognizer*)sender {
+    
+    if (sender.state == UIGestureRecognizerStateBegan)
+    {
+        NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
+        
+        AudioServicesPlayAlertSound(kSystemSoundID_Vibrate);
+        
+        CGPoint point = [sender locationInView:self.mapview];
+        CLLocationCoordinate2D locCoord = [self.mapview convertPoint:point toCoordinateFromView:self.mapview];
+        
+        ScanAnnotation *dropPin = [[ScanAnnotation alloc] init];
+        radar = locCoord;
+        
+        [prefs setObject:[NSNumber numberWithDouble:locCoord.latitude] forKey:@"radar_lat"];
+        [prefs setObject:[NSNumber numberWithDouble:locCoord.longitude] forKey:@"radar_long"];
+        
+        [prefs synchronize];
+        
+        dropPin.coordinate = locCoord;
+        dropPin.title = @"Scan location";
+        
+        for (int i = 0; i < [self.mapview.annotations count]; i++) {
+            MKPointAnnotation *annotation = (MKPointAnnotation *)self.mapview.annotations[i];
+            
+            if([self.mapview.annotations[i] isKindOfClass:[ScanAnnotation class]])
+                [self.mapview removeAnnotation:annotation];
+        }
+        
+        [self sendNewLocationToServer:locCoord.latitude and:locCoord.longitude];
+        [self.mapview addAnnotation:dropPin];
+    }
+}
+
+-(void)sendNewLocationToServer:(CLLocationDegrees)latitude and:(CLLocationDegrees)longitude
+{
+    NSString *requestStr   = self.requestNewLocationStr;
+    requestStr  = [self.requestNewLocationStr stringByReplacingOccurrencesOfString:@"%%latitude%%" withString:[NSString stringWithFormat:@"%f", latitude]];
+    requestStr  = [requestStr stringByReplacingOccurrencesOfString:@"%%longitude%%" withString:[NSString stringWithFormat:@"%f", longitude]];
+    
+    /*************************************/
+    //           Requête POST            //
+    /*************************************/
+#pragma mark Requête POST
+    
+    NSURL *url = [NSURL URLWithString:requestStr];
+    NSMutableURLRequest *request = [[NSMutableURLRequest alloc] init];
+    [request setURL:url];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/json;charset=UTF-8" forHTTPHeaderField:@"content-type"];
+    request.cachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
+    
+    // Lancement de la requête
+    [NSURLConnection sendAsynchronousRequest:request
+                                       queue:[NSOperationQueue currentQueue]
+                           completionHandler:^(NSURLResponse *response, NSData *data, NSError *error) {
+                               NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+                                if (data != nil && error == nil && [httpResponse statusCode] == 200)
+                                {
+                                    NSString *dataStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+                                    if([dataStr isEqualToString:@"ok"])
+                                        NSLog(@"Position changed !");
+                                }
+                                else
+                                {
+                                    NSLog(@"Error %@", error);
+                                }
+                                   
+                               }];
+
 }
 
 -(void)loadSavedData
@@ -112,6 +216,21 @@
     
     if([defaults objectForKey:@"display_common"] != nil)
         isHideVeryCommonActivated       = [defaults boolForKey:@"display_common"];
+    
+    if(([defaults objectForKey:@"radar_lat"] != nil) && ([defaults objectForKey:@"radar_long"] != nil))
+    {
+        NSLog(@"[!] - Restore radar");
+        CLLocationCoordinate2D locCoord;
+        locCoord.latitude   = [defaults doubleForKey:@"radar_lat"];
+        locCoord.longitude  = [defaults doubleForKey:@"radar_long"];
+        
+        ScanAnnotation *dropPin = [[ScanAnnotation alloc] init];
+        radar = locCoord;
+        
+        dropPin.coordinate = locCoord;
+        dropPin.title = @"Scan location";
+        [self.mapview addAnnotation:dropPin];
+    }
 }
 
 -(void)loadSoundFiles
@@ -157,15 +276,18 @@
 - (void)mapView:(MKMapView *)mapView regionDidChangeAnimated:(BOOL)animated {
     
     NSArray *annotations = [self.mapview annotations];
-    PokemonAnnotation *annotation = nil;
-    for (int i=0; i<[annotations count]; i++)
+    MKPointAnnotation *annotation = nil;
+    
+    for (int i = 0; i < [annotations count]; i++)
     {
-        annotation = (PokemonAnnotation *)[annotations objectAtIndex:i];
-        if (self.mapview.region.span.latitudeDelta > .15)
+        annotation = (MKPointAnnotation *)[annotations objectAtIndex:i];
+        if (self.mapview.region.span.latitudeDelta > .20)
         {
-            [[self.mapview viewForAnnotation:annotation] setHidden:YES];
+            if([annotation isKindOfClass:[PokemonAnnotation class]] || [annotation isKindOfClass:[GymAnnotation class]] || [annotation isKindOfClass:[PokestopAnnotation class]])
+                [[self.mapview viewForAnnotation:annotation] setHidden:YES];
         }
-        else {
+        else
+        {
             [[self.mapview viewForAnnotation:annotation] setHidden:NO];
         }
     }
@@ -229,9 +351,9 @@
     //Loading in background
     
     /*************************************/
-    //           Requête POST            //
+    //            Requête GET            //
     /*************************************/
-#pragma mark Requête POST
+#pragma mark Requête GET
     
     NSURL *url = [NSURL URLWithString:self.requestStr];
     NSMutableURLRequest *request = [[NSMutableURLRequest alloc] init];
@@ -245,13 +367,13 @@
                                        queue:[NSOperationQueue currentQueue]
                            completionHandler:^(NSURLResponse *response, NSData *data, NSError *error) {
                                NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+                               
                                if (data != nil && error == nil && [httpResponse statusCode] == 200)
                                {
                                    NSDictionary *jsonData = [NSJSONSerialization
                                                              JSONObjectWithData:data
                                                              options:NSJSONReadingMutableContainers
                                                              error:&error];
-                                   
                                    if([self.display_pokemons_str isEqualToString:@"true"])
                                    {
                                        BOOL annFound = NO;
@@ -293,10 +415,11 @@
                                                    
                                                    NSString *key    = [self.pokemons[i] objectForKey:@"pokemon_id"];
                                                    
-                                                   if(![self isPokemonVeryCommon:[NSString stringWithFormat:@"%@", key]])
+                                                   if(![self isPokemonVeryCommon:[NSString stringWithFormat:@"%@", key]] && ([date timeIntervalSinceNow] > 0.0))
                                                    {
                                                        point.spawnpointID   = [self.pokemons[i] objectForKey:@"spawnpoint_id"];
                                                        point.expirationDate = date;
+                                                       
                                                        point.coordinate     = pokemonLocation;
                                                        point.title          = [self.localization objectForKey:[NSString stringWithFormat:@"%@", key]];
                                                        point.subtitle       = [NSString stringWithFormat:@"Disappears at %02d:%02d:%02d", (int)hour, (int)minute, (int)second];
@@ -342,7 +465,7 @@
                                                            }
                                                            else
                                                            {
-                                                               NSLog(@"Pokemon added on map");
+                                                               NSLog(@"Pokemon added on map %@", point.title);
                                                                if(isNormalNotificationActivated)
                                                                {
                                                                    self.notification = [CWStatusBarNotification new];
@@ -447,14 +570,14 @@
                                                }
                                            }
                                        }
-                                 
-                                    firstConnection = NO;
+                                   }
+                                   
+                                   firstConnection = NO;
+                                   
                                }
                                else
                                {
-                                   NSLog(@"%@", error);
-                               }
-                                   
+                                   NSLog(@"Error %@", error);
                                }
                            }];
 }
@@ -468,10 +591,12 @@
     BOOL display_pokestops          = [defaults boolForKey:@"display_pokestops"];
     BOOL display_gyms               = [defaults boolForKey:@"display_gyms"];
     
-    NSString *request = SERVER_API;
-    self.display_pokemons_str  = @"true";
-    self.display_pokestops_str = @"true";
-    self.display_gyms_str      = @"true";
+    NSString *request           = SERVER_API_DATA;
+    self.requestNewLocationStr  = SERVER_API_LOCA;
+    
+    self.display_pokemons_str   = @"true";
+    self.display_pokestops_str  = @"false";
+    self.display_gyms_str       = @"true";
     
     if([server_addr length] > 0)
     {
@@ -497,6 +622,8 @@
         request = [request stringByReplacingOccurrencesOfString:@"%%pokemon_display%%" withString:self.display_pokemons_str];
         request = [request stringByReplacingOccurrencesOfString:@"%%pokestops_display%%" withString:self.display_pokestops_str];
         request = [request stringByReplacingOccurrencesOfString:@"%%gyms_display%%" withString:self.display_gyms_str];
+        
+        self.requestNewLocationStr = [self.requestNewLocationStr stringByReplacingOccurrencesOfString:@"%%server_addr%%" withString:server_addr];
     }
     else
     {
@@ -505,7 +632,7 @@
     
     return request;
 }
-                                                  
+
 -(BOOL)isPokemonVeryCommon:(NSString *)idPokeToTest
 {
     BOOL returnState = NO;
@@ -526,7 +653,7 @@
 -(MKAnnotationView*)mapView:(MKMapView*)mapView viewForAnnotation:(id<MKAnnotation>)annotation {
     
     MKAnnotationView *view = nil;
-    
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     if ((id<MKAnnotation>)annotation != mapView.userLocation) {
         
         if([annotation isKindOfClass:[PokemonAnnotation class]])
@@ -545,6 +672,34 @@
                 view.canShowCallout = YES;
                 view.rightCalloutAccessoryView = button;
                 view.image = [UIImage imageNamed:[NSString stringWithFormat:@"%d.png", annotationPokemon.pokemonID]];
+                
+                if([defaults boolForKey:@"display_time"]) {
+                    [view addSubview:[self timeLabelForAnnotation:annotationPokemon withContainerFrame:view.frame]];
+                }
+                
+                if([defaults boolForKey:@"display_distance"]) {
+                    [view addSubview:[self distanceLabelForAnnotation:annotationPokemon withContainerFrame:view.frame]];
+                }
+                
+                
+            } else {
+                // TODO: Its just for 'live' view update when settings changed, probably need to optimise
+                for (UIView *subView in view.subviews) {
+                    if ([subView isKindOfClass:[TimeLabel class]]) {
+                        [subView removeFromSuperview];
+                    }
+                    if ([subView isKindOfClass:[DistanceLabel class]]) {
+                        [subView removeFromSuperview];
+                    }
+                }
+                
+                if([defaults boolForKey:@"display_time"]) {
+                    [view addSubview:[self timeLabelForAnnotation:annotationPokemon withContainerFrame:view.frame]];
+                }
+                
+                if([defaults boolForKey:@"display_distance"]) {
+                    [view addSubview:[self distanceLabelForAnnotation:annotationPokemon withContainerFrame:view.frame]];
+                }
             }
         }
         else if ([annotation isKindOfClass:[GymAnnotation class]])
@@ -597,6 +752,26 @@
                 
                 view.image = pokestopImage;
             }
+        }
+        else if ([annotation isKindOfClass:[ScanAnnotation class]])
+        {
+            //ScanAnnotation *annotationScan = annotation;
+            
+            SVPulsingAnnotationView *pulsingView = (SVPulsingAnnotationView *)[mapView dequeueReusableAnnotationViewWithIdentifier:@"scan"];
+            
+            if (!view) {
+                
+                pulsingView = [[SVPulsingAnnotationView alloc] initWithAnnotation:annotation reuseIdentifier:@"scan"];
+                pulsingView.canShowCallout = YES;
+                
+                CGPoint point = view.center;
+                point.x = (point.x + 20);
+                point.y = (point.y + 20);
+                
+                pulsingView.annotationColor = [UIColor colorWithRed:0.10 green:0.74 blue:0.61 alpha:1.0];
+            }
+            
+            return pulsingView;
         }
         
     }
@@ -669,6 +844,18 @@
     [self loadData];
 }
 
+-(void)refreshPokemons {
+    NSArray *annotations = [self.mapview annotations];
+
+    NSPredicate *filterPredicate = [NSComparisonPredicate
+                                    predicateWithLeftExpression:[NSExpression expressionForEvaluatedObject]
+                                    rightExpression:[NSExpression expressionForConstantValue:[PokemonAnnotation class]]
+                                    customSelector:@selector(isMemberOfClass:)];
+    annotations = [annotations filteredArrayUsingPredicate:filterPredicate];
+    [self.mapview removeAnnotations:annotations];
+    [self.mapview addAnnotations:annotations];
+}
+
 -(void)mapCleaner
 {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
@@ -681,7 +868,7 @@
                     
                     if([annotationPoke.expirationDate timeIntervalSinceNow] < 0.0)
                     {
-                        NSLog(@"Pokemon removed");
+                        NSLog(@"Pokemon removed %@", annotation.title);
                         
                         [[NSOperationQueue mainQueue] addOperationWithBlock:^ {
                             [self.mapview removeAnnotation:annotation];
@@ -699,6 +886,40 @@
     region.span.latitudeDelta   = MAP_SCALE;
     region.span.longitudeDelta  = MAP_SCALE;
     [self.mapview setRegion:region animated:YES];
+}
+
+-(IBAction)radarAction:(id)sender
+{
+    if(radar.latitude != 0)
+    {
+        region.center = radar;
+        region.span.latitudeDelta   = MAP_SCALE;
+        region.span.longitudeDelta  = MAP_SCALE;
+        [self.mapview setRegion:region animated:YES];
+    }
+}
+
+- (UILabel*)timeLabelForAnnotation:(PokemonAnnotation*)annotation withContainerFrame:(CGRect)frame {
+    TimeLabel *timeLabel;
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"display_timer"]) {
+        timeLabel = [[TimerLabel alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 20)];
+    } else {
+        timeLabel = [[TimeLabel alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 20)];
+        
+    }
+    [timeLabel setDate:annotation.expirationDate];
+    return timeLabel;
+}
+
+- (UILabel*)distanceLabelForAnnotation:(PokemonAnnotation*)annotation withContainerFrame:(CGRect)frame {
+    CLLocation *pokemonLocation = [[CLLocation alloc] initWithLatitude:annotation.coordinate.latitude longitude:annotation.coordinate.longitude];
+    ;
+    CLLocation *userLocation = [[CLLocation alloc] initWithLatitude:[[NSUserDefaults standardUserDefaults] doubleForKey:@"radar_lat"] longitude:[[NSUserDefaults standardUserDefaults] doubleForKey:@"radar_long"]];
+    CLLocationDistance distance = [pokemonLocation distanceFromLocation:userLocation];
+    
+    DistanceLabel *distanceLabel = [[DistanceLabel alloc] initWithFrame:CGRectMake(0, 0, frame.size.width, 20)];
+    [distanceLabel setDistance:distance];
+    return distanceLabel;
 }
 
 @end

@@ -37,7 +37,7 @@
         [self.pokemonsSwitch setOn:[prefs boolForKey:@"display_pokemons"]];
     
     if([prefs objectForKey:@"display_pokestops"] == nil)
-        [self.pokestopsSwitch setOn:YES]; // Not already set
+        [self.pokestopsSwitch setOn:NO]; // Not already set
     else
         [self.pokestopsSwitch setOn:[prefs boolForKey:@"display_pokestops"]];
     
@@ -50,6 +50,21 @@
         [self.commonSwitch setOn:YES]; // Not already set
     else
         [self.commonSwitch setOn:[prefs boolForKey:@"display_common"]];
+
+    if([prefs objectForKey:@"display_distance"] == nil)
+        [self.distanceSwitch setOn:NO]; // Not already set
+    else
+        [self.distanceSwitch setOn:[prefs boolForKey:@"display_distance"]];
+    
+    if([prefs objectForKey:@"display_time"] == nil)
+        [self.timeSwitch setOn:NO]; // Not already set
+    else
+        [self.timeSwitch setOn:[prefs boolForKey:@"display_time"]];
+    
+    if([prefs objectForKey:@"display_timer"] == nil)
+        [self.timeTimerSwitch setOn:NO]; // Not already set
+    else
+        [self.timeTimerSwitch setOn:[prefs boolForKey:@"display_timer"]];
 }
 
 -(IBAction)closeAction:(UIBarButtonItem *)sender
@@ -82,6 +97,16 @@
                                     object:nil
                                     userInfo:nil];
     
+    [[NSNotificationCenter defaultCenter]
+                                    postNotificationName:@"LaunchTimers"
+                                    object:nil
+                                    userInfo:nil];
+    
+    [[NSNotificationCenter defaultCenter]
+                                    postNotificationName:@"RefreshPokemons"
+                                    object:nil
+                                    userInfo:nil];
+    
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
@@ -102,7 +127,15 @@
         case SWITCH_COMMON:
             [prefs setObject:[NSNumber numberWithBool:self.commonSwitch.on] forKey:@"display_common"];
             break;
-            
+        case SWITCH_DISTANCE:
+            [prefs setObject:[NSNumber numberWithBool:self.distanceSwitch.on] forKey:@"display_distance"];
+            break;
+        case SWITCH_TIME:
+            [prefs setObject:[NSNumber numberWithBool:self.timeSwitch.on] forKey:@"display_time"];
+            break;
+        case SWITCH_TIMETIMER:
+            [prefs setObject:[NSNumber numberWithBool:self.timeTimerSwitch.on] forKey:@"display_timer"];
+            break;
         default:
             // Nothing
             break;

@@ -15,6 +15,9 @@
 #define SWITCH_POKESTOPS    1
 #define SWITCH_GYMS         2
 #define SWITCH_COMMON       3
+#define SWITCH_DISTANCE     4
+#define SWITCH_TIME         5
+#define SWITCH_TIMETIMER    6
 
 #define SWITCH_NOTIFI_NORM  0
 #define SWITCH_NOTIFI_FAV   1
@@ -25,6 +28,7 @@
 #define TEAM_RED            2
 #define TEAM_YELLOW         3
 
-#define SERVER_API          @"http://%%server_addr%%/raw_data?pokemon=%%pokemon_display%%&pokestops=%%pokestops_display%%&gyms=%%gyms_display%%"
+#define SERVER_API_DATA     @"http://%%server_addr%%/raw_data?pokemon=%%pokemon_display%%&pokestops=%%pokestops_display%%&gyms=%%gyms_display%%"
+#define SERVER_API_LOCA     @"http://%%server_addr%%/next_loc?lat=%%latitude%%&lon=%%longitude%%"
 
 #endif /* global_h */
