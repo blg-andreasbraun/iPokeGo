@@ -227,22 +227,35 @@
     request.cachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
     
     // Lancement de la requête
-    [NSURLConnection sendAsynchronousRequest:request
-                                       queue:[NSOperationQueue currentQueue]
-                           completionHandler:^(NSURLResponse *response, NSData *data, NSError *error) {
-                               NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
-                                if (data != nil && error == nil && [httpResponse statusCode] == 200)
-                                {
-                                    NSString *dataStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-                                    if([dataStr isEqualToString:@"ok"])
-                                        NSLog(@"Position changed !");
-                                }
-                                else
-                                {
-                                    NSLog(@"Error %@", error);
-                                }
-                                   
-                               }];
+    [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        if (data != nil && error == nil && [httpResponse statusCode] == 200)
+        {
+            NSString *dataStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+            if([dataStr isEqualToString:@"ok"])
+            NSLog(@"Position changed !");
+        }
+        else
+        {
+            NSLog(@"Error %@", error);
+        }
+    }] resume];
+//    [NSURLConnection sendAsynchronousRequest:request
+//                                       queue:[NSOperationQueue currentQueue]
+//                           completionHandler:^(NSURLResponse *response, NSData *data, NSError *error) {
+//                               NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+//                                if (data != nil && error == nil && [httpResponse statusCode] == 200)
+//                                {
+//                                    NSString *dataStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+//                                    if([dataStr isEqualToString:@"ok"])
+//                                        NSLog(@"Position changed !");
+//                                }
+//                                else
+//                                {
+//                                    NSLog(@"Error %@", error);
+//                                }
+//                                   
+//                               }];
 
 }
 
@@ -482,6 +495,8 @@
                                                            point.coordinate     = pokemonLocation;
                                                            point.title          = [self.localization objectForKey:[NSString stringWithFormat:@"%@", key]];
                                                            point.subtitle       = [NSString localizedStringWithFormat:NSLocalizedString(@"Disappears at", @"The hint in a annotation callout that indicates when a Pokémon disappears."), [NSDateFormatter localizedStringFromDate:date dateStyle:NSDateFormatterNoStyle timeStyle:NSDateFormatterMediumStyle]];
+                                                           point.subtitle       = [point.subtitle stringByAppendingString:[NSString stringWithFormat:@" (%.4f, %.4f)", pokemonLocation.latitude, pokemonLocation.longitude]];
+                                                           
                                                            point.pokemonID      = [[self.pokemons[i] valueForKey:@"pokemon_id"] intValue];
                                                            
                                                            [self.mapview addAnnotation:point];
