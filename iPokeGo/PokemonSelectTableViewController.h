@@ -8,7 +8,6 @@
 
 #import <UIKit/UIKit.h>
 #import "global.h"
-#import "PokemonTableViewCell.h"
 
 @interface PokemonSelectTableViewController : UITableViewController
 {

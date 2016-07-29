@@ -75,27 +75,12 @@
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     
-    PokemonTableViewCell *cell      = [tableView dequeueReusableCellWithIdentifier:@"pokemoncell" forIndexPath:indexPath];
+    UITableViewCell *cell      = [tableView dequeueReusableCellWithIdentifier:@"pokemoncell" forIndexPath:indexPath];
     NSString *key                   = [NSString stringWithFormat:@"%d", ((int)indexPath.row + 1)];
     
-    cell.pokemonName.text           = [self.localization objectForKey:[NSString stringWithFormat:@"%@", key]];
+    cell.textLabel.text           = [self.localization objectForKey:[NSString stringWithFormat:@"%@", key]];
 
-    UIImage *largeImage = [UIImage imageNamed : @"icons-hd.png"];
-    
-    /* Spritesheet has 7 columns */
-    int x = indexPath.row%SPRITESHEET_COLS*SPRITE_SIZE;
-    
-    int y = (int)indexPath.row + 1;
-    
-    while(y%SPRITESHEET_COLS != 0) y++;
-    
-    y = ((y/SPRITESHEET_COLS) -1) * SPRITE_SIZE;
-    
-    CGRect cropRect = CGRectMake(x, y, SPRITE_SIZE, SPRITE_SIZE);
-    
-    CGImageRef imageRef = CGImageCreateWithImageInRect([largeImage CGImage], cropRect);
-    cell.pokemonimageView.image = [UIImage imageWithCGImage:imageRef];
-    CGImageRelease(imageRef);
+    cell.imageView.image = [UIImage imageNamed:[NSString stringWithFormat:@"%ld", (indexPath.row +1)]];
     
     if([[self.pokemonChecked objectAtIndex:indexPath.row] boolValue])
         [cell setAccessoryType:UITableViewCellAccessoryCheckmark];
@@ -107,7 +92,7 @@
 
 -(void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    PokemonTableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+    UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
     
     if([[self.pokemonChecked objectAtIndex:indexPath.row] boolValue]) {
         [self.pokemonChecked replaceObjectAtIndex:indexPath.row withObject:[NSNumber numberWithBool:NO]];
