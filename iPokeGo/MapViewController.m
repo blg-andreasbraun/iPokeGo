@@ -1038,7 +1038,6 @@
 
 - (UILabel*)distanceLabelForAnnotation:(PokemonAnnotation*)annotation withContainerFrame:(CGRect)frame {
     CLLocation *pokemonLocation = [[CLLocation alloc] initWithLatitude:annotation.coordinate.latitude longitude:annotation.coordinate.longitude];
-    ;
     
     CLLocation *baseLocation = self.mapview.userLocation.location;
     
