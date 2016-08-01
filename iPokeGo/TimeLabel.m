@@ -15,7 +15,7 @@
 {
     self = [super initWithFrame:frame];
     if (self) {
-        self.font = [UIFont boldSystemFontOfSize:13.0];
+        self.font = [UIFont boldSystemFontOfSize:10.0];
         self.textAlignment = NSTextAlignmentLeft;
     }
     return self;
@@ -25,7 +25,7 @@
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     [formatter setDateFormat:@"HH:mm"];
 
-    self.attributedText = [NSString stringWithFormat:@"%@", [formatter stringFromDate:date]].outlinedAttributedString;
+    self.text = [NSString stringWithFormat:@"%@", [formatter stringFromDate:date]];
 }
 
 @end

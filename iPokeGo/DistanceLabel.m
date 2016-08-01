@@ -8,6 +8,7 @@
 
 #import "DistanceLabel.h"
 #import "NSString+Formatting.h"
+@import CoreLocation;
 
 @implementation DistanceLabel
 
@@ -15,14 +16,16 @@
 {
     self = [super initWithFrame:frame];
     if (self) {
-        self.font = [UIFont boldSystemFontOfSize:13.0];
+        self.font = [UIFont boldSystemFontOfSize:10.0];
         self.textAlignment = NSTextAlignmentRight;
     }
     return self;
 }
 
-- (void)setDistance:(double)distance {
-    self.attributedText = [NSString stringWithFormat:@"%.0fm", distance].outlinedAttributedString;
+- (void)setDistanceBetweenUser:(CLLocation *)user andLocation:(CLLocation *)location
+{
+    CLLocationDistance distance = [user distanceFromLocation:location];
+    self.text = [NSString stringWithFormat:@"%.0fm", distance];
 }
 
 @end

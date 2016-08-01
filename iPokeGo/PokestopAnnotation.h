@@ -7,10 +7,14 @@
 //
 
 #import <MapKit/MapKit.h>
+#import "CoreDataEntities.h"
 
 @interface PokestopAnnotation : MKPointAnnotation
 
-@property int pokestopID;
-@property NSString *lure;
+@property NSString *pokestopID;
+@property BOOL hasLure;
+@property int luredPokemonID;
+
+- (instancetype)initWithPokestop:(PokeStop *)pokeStop;
 
 @end

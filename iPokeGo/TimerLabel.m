@@ -16,8 +16,34 @@
 
 @implementation TimerLabel
 
+NSString * const TimerLabelUpdateNotification = @"Poke.TimerLabelUpdateNotification";
+
+- (instancetype)init {
+    if (self = [super init]) {
+        [self setup];
+    }
+    return self;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (self = [super initWithFrame:frame]) {
+        [self setup];
+    }
+    return self;
+}
+
+- (instancetype)initWithCoder:(NSCoder *)aDecoder {
+    if (self = [super initWithCoder:aDecoder]) {
+        [self setup];
+    }
+    return self;
+}
+
+- (void)setup {
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(timerFired) name:TimerLabelUpdateNotification object:nil];
+}
+
 - (void)setDate:(NSDate*)date {
-    self.timer = [NSTimer scheduledTimerWithTimeInterval:1.0f target:self selector:@selector(timerFired) userInfo:nil repeats:YES];
     self.expiryDate = date;
     [self setTimeInterval:[self.expiryDate timeIntervalSinceNow]];
 }
@@ -26,8 +52,18 @@
     NSTimeInterval expiredIn = [self.expiryDate timeIntervalSinceNow];
     if (expiredIn > 0) {
         [self setTimeInterval:expiredIn];
+    }
+}
+
+- (void)setHidden:(BOOL)hidden
+{
+    super.hidden = hidden;
+    if (hidden) {
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:TimerLabelUpdateNotification object:nil];
     } else {
-        [self.timer invalidate];
+        [self setup];
+        NSTimeInterval expiredIn = [self.expiryDate timeIntervalSinceNow];
+        [self setTimeInterval:expiredIn];
     }
 }
 
@@ -35,7 +71,10 @@
     NSInteger integerValue = (NSInteger)timeInterval;
     uint8_t minutes = integerValue / 60;
     uint8_t seconds = integerValue % 60;
-    self.attributedText = [NSString stringWithFormat:@"%d:%02d", minutes, seconds].outlinedAttributedString;
+    self.text = [NSString stringWithFormat:@"%d:%02d", minutes, seconds];
 }
 
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
 @end
